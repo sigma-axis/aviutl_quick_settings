@@ -1,0 +1,7 @@
+[submodule "sdk"]
+	path = sdk
+	url = https://github.com/sigma-axis/aviutl_exedit_sdk.git
+	branch = self-use
+[submodule "json"]
+	path = json
+	url = https://github.com/sheredom/json.h.git
