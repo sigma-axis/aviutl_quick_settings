@@ -1,0 +1,26 @@
+{
+	"metrics" : { "max_width" : 0, "margin_h" : 8, "margin_v" : 6, "gap_v" : 2 },
+	"gui_items" : [
+		{ "id" : "frame_jump_distance" },
+		{ "id" : "resume_enabled", "push_like" : false },
+		{ "id" : "snaps_window", "push_like" : false },
+		{ "id" : "seeks_clicked_point", "push_like" : false },
+		{ "id" : "----", "pad_h" : 0, "pad_v" : 4 },
+		{ "id" : "tl_time_format", "push_like" : false },
+		{ "id" : "dlg_time_format", "push_like" : false },
+		{ "id" : "----", "pad_h" : 0, "pad_v" : 4 },
+		{ "id" : "layer_size_mode", "push_like" : false },
+		{ "id" : "****", "pad_v" : 4 },
+		{ "id" : "playback_syncs_cursor", "push_like" : false },
+		{ "id" : "scroll_follows_cursor", "push_like" : false },
+		{ "id" : "groups_drag_drop", "push_like" : false },
+		{ "id" : "relocates_file_path", "push_like" : false },
+		{ "id" : "split_calcs_midvalue", "push_like" : false },
+		{ "id" : "splits_at_current", "push_like" : false },
+		{ "id" : "drags_adjacent_obj", "push_like" : false },
+		{ "id" : "split_seps_groups", "push_like" : false },
+		{ "id" : "clamps_into_rgb_box", "push_like" : false },
+		{ "id" : "****", "pad_v" : 4 },
+		{ "id" : "auto_backup_enabled", "push_like" : false }
+	]
+}
