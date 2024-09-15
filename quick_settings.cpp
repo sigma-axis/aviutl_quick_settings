@@ -312,8 +312,8 @@ protected:
 			return false;
 
 		auto buf = Encodes::to_narrow(wbuf);
-		auto result = std::from_chars(&*buf.cbegin(), &*buf.cend(), num);
-		return result.ec == std::errc{} && result.ptr == &*buf.cend();
+		auto result = std::from_chars(&*buf.begin(), &*buf.end(), num);
+		return result.ec == std::errc{} && result.ptr == &*buf.end();
 	}
 
 	HWND create_check(HWND parent, wchar_t const* text, int x, int y, int w, int h,
@@ -463,8 +463,11 @@ struct setting_item_frame_jump : setting_item {
 		if (label != nullptr) {
 			switch (code) {
 			case EN_SETFOCUS:
+			{
 				::SendMessageW(ctrl, EM_SETSEL, 0, -1);
-				break;
+				return false;
+			}
+
 			case EN_KILLFOCUS:
 			{
 				size_t idx = 0;
@@ -475,12 +478,13 @@ struct setting_item_frame_jump : setting_item {
 					try_parse_edit(ctrl, value) && value > 0) {
 					// valid number was input. write it as an effective setting.
 					units[idx].gui_val = value;
-					push(idx, value);
+					return push(idx, value);
 				}
-				else // invalid number input. rewind the edit state.
+				else {
+					// invalid number input. rewind the edit state.
 					pull(units[idx], units[idx].gui_val);
-
-				break;
+					return false;
+				}
 			}
 			}
 		}
@@ -540,12 +544,13 @@ private:
 		::SendMessageW(unit.edit, WM_SETTEXT, {},
 			reinterpret_cast<LPARAM>(std::to_wstring(value).c_str()));
 	}
-	void push(size_t idx, int32_t gui_val) {
+	bool push(size_t idx, int32_t gui_val) {
 		auto* target = &(*aviutl.frame_jump_distance)[idx];
-		if (*target == gui_val) return;
+		if (*target == gui_val) return false;
 
 		*target = gui_val;
 		aviutl_ini::write_int(ini_keys[idx], gui_val);
+		return true;
 	}
 };
 
@@ -756,15 +761,15 @@ struct setting_item_time_fmt : setting_item_radio_base {
 				::SendMessageW(choose_radio(prev_val), BM_SETCHECK, BST_UNCHECKED, 0);
 				::SendMessageW(ctrl, BM_SETCHECK, BST_CHECKED, 0);
 			}
-			push(gui_val);
+			return push(gui_val);
 		}
 		return false;
 	}
 	bool menu_command() override
 	{
-		push(toggle(*target));
+		auto ret = push(toggle(*target));
 		on_update();
-		return false;
+		return ret;
 	}
 	wchar_t const* menu_title() const override { return title; }
 
@@ -835,7 +840,7 @@ protected:
 		case time_fmt::frame:	return time_fmt::hms;
 		}
 	}
-	virtual void push(time_fmt val) = 0;
+	virtual bool push(time_fmt val) = 0;
 };
 struct setting_item_tl_time_fmt : setting_item_time_fmt {
 	constexpr setting_item_tl_time_fmt(wchar_t const* title)
@@ -843,9 +848,9 @@ struct setting_item_tl_time_fmt : setting_item_time_fmt {
 
 protected:
 	// syncs between GUIs and effective settings.
-	void push(time_fmt val) override
+	bool push(time_fmt val) override
 	{
-		if (*target == val) return;
+		if (*target == val) return false;
 
 		// update the setting from radio button state.
 		*target = val;
@@ -856,6 +861,7 @@ protected:
 		rc.left = timeline_layer_header_width;
 		rc.bottom = timeline_ruler_height;
 		::InvalidateRect(exedit.fp->hwnd, &rc, FALSE);
+		return true;
 	}
 };
 struct setting_item_dlg_time_fmt : setting_item_time_fmt {
@@ -864,15 +870,16 @@ struct setting_item_dlg_time_fmt : setting_item_time_fmt {
 
 protected:
 	// syncs between GUIs and effective settings.
-	void push(time_fmt val) override
+	bool push(time_fmt val) override
 	{
-		if (*target == val) return;
+		if (*target == val) return false;
 
 		// update the setting from radio button state.
 		*target = val;
 
 		// update the top part of the dialog.
 		exedit.update_dialog_top();
+		return true;
 	}
 };
 
@@ -920,15 +927,15 @@ struct setting_item_layer_height : setting_item_radio_base {
 				::SendMessageW(choose_radio(prev_val), BM_SETCHECK, BST_UNCHECKED, 0);
 				::SendMessageW(ctrl, BM_SETCHECK, BST_CHECKED, 0);
 			}
-			push(gui_val);
+			return push(gui_val);
 		}
 		return false;
 	}
 	bool menu_command() override
 	{
-		push(toggle(*exedit.layer_size_mode));
+		auto ret = push(toggle(*exedit.layer_size_mode));
 		on_update();
-		return false;
+		return ret;
 	}
 	wchar_t const* menu_title() const override { return title; }
 
@@ -998,9 +1005,9 @@ private:
 	}
 
 	// syncs between GUIs and effective settings.
-	void push(int32_t val)
+	bool push(int32_t val)
 	{
-		if (*exedit.layer_size_mode == val) return;
+		if (*exedit.layer_size_mode == val) return false;
 
 		// apply the chosen preset of values.
 		*exedit.layer_size_mode = val;
@@ -1016,6 +1023,8 @@ private:
 		::SendMessageW(exedit.fp->hwnd, WM_SIZING, WMSZ_BOTTOM, reinterpret_cast<LPARAM>(&rc));
 		::SetWindowPos(exedit.fp->hwnd, nullptr, 0, 0,
 			rc.right - rc.left, rc.bottom - rc.top, SWP_NOACTIVATE | SWP_NOMOVE | SWP_NOZORDER);
+
+		return true;
 	}
 };
 
@@ -1051,7 +1060,7 @@ struct setting_item_separator : setting_item_gap {
 ////////////////////////////////
 // オプション実体の定義．
 ////////////////////////////////
-static setting_item_check<false> // 変数上書きだけで設定変更が成立するもの．
+static setting_item_check<true> // 変数上書きだけで設定変更が成立するもの．(ただし，他プラグインへの更新通知のため画面更新はする．)
 	scroll_follows_cursor	{ exedit.scroll_follows_cursor,	L"カーソル移動時に自動でスクロール" },
 	groups_drag_drop		{ exedit.groups_drag_drop,		L"D && D読み込み時に複数オブジェクトをグループ化" },
 	relocates_file_path		{ exedit.relocates_file_path,	L"ファイルの場所が変更された時にプロジェクトパスから読む" },
@@ -1067,7 +1076,7 @@ static setting_item_check<true> // 画面更新で十分なもの．
 static setting_item_sync_cursor // 緑の線を隠す必要があるもの．
 	playback_syncs_cursor	{ L"再生ウィンドウで再生した時にカーソルを連動" };
 
-static setting_item_check_ini<false> // 変数上書きと .ini への書き出しが必要なもの．
+static setting_item_check_ini<true> // 変数上書きと .ini への書き出しが必要なもの．(他プラグインへの更新通知のため画面更新もする．)
 	resume_enabled			{ aviutl.resume_enabled,		L"編集のレジューム機能を有効",					"editresume" },
 	snaps_window			{ aviutl.snaps_window,			L"関連ウィンドウ同士を移動時にスナップする",		"windowsnap" },
 	seeks_clicked_point		{ aviutl.seeks_clicked_point,	L"トラックバーでクリックした位置に直接移動する",	"trackbarclick" };
@@ -1291,7 +1300,7 @@ private:
 				gui_items.push_back(sep);
 				load_separator_options(obj, sep);
 			}
-			else if (auto entry = entries.find(id); entry != entries.cend()) {
+			else if (auto entry = entries.find(id); entry != entries.end()) {
 				// recognized a preset item.
 				auto* item = entry->second;
 
@@ -1535,7 +1544,7 @@ BOOL WINAPI DllMain(HINSTANCE hinst, DWORD fdwReason, LPVOID lpvReserved)
 // 看板．
 ////////////////////////////////
 #define PLUGIN_NAME		"クイック設定"
-#define PLUGIN_VERSION	"v1.00"
+#define PLUGIN_VERSION	"v1.01-beta1"
 #define PLUGIN_AUTHOR	"sigma-axis"
 #define PLUGIN_INFO_FMT(name, ver, author)	(name##" "##ver##" by "##author)
 #define PLUGIN_INFO		PLUGIN_INFO_FMT(PLUGIN_NAME, PLUGIN_VERSION, PLUGIN_AUTHOR)
